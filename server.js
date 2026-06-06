@@ -45,15 +45,15 @@ async function seed() {
   }
   const owner = await db.users.findOne({ role: 'owner' });
   if (!owner) {
-    const hash = await bcrypt.hash('Mata12', 10);
+    const hash = await bcrypt.hash('admin123', 10);
     const uid = await getNextUID(); // uid = 1
     await db.users.insert({
-      uid, username: 'Admin', email: 'owner@equinox.gg',
+      uid, username: 'aaa', email: 'owner@equinox.gg',
       password: hash, role: 'owner',
       createdAt: Date.now(), posts: 0, invitesLeft: 999,
     });
     await db.invites.insert({ code: 'EQUINOX-BETA', createdBy: uid, used: false, createdAt: Date.now() });
-    console.log('Owner: username=Admin password=Mata12  |  Invite: EQUINOX-BETA');
+    console.log('Owner: username=aaa password=admin123  |  Invite: EQUINOX-BETA');
   }
 }
 seed();
@@ -139,6 +139,20 @@ app.post('/api/shoutbox', auth, async (req, res) => {
 
 app.delete('/api/shoutbox/:id', adminAuth, async (req, res) => {
   await db.shoutbox.remove({ _id: req.params.id });
+  res.json({ ok: true });
+});
+
+// ── CHANGE PASSWORD ───────────────────────────────────────────────────────────
+app.post('/api/changepassword', auth, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) return res.json({ error: 'All fields required' });
+  if (newPassword.length < 6) return res.json({ error: 'New password min. 6 characters' });
+  const user = await db.users.findOne({ uid: req.session.uid });
+  if (!user) return res.json({ error: 'User not found' });
+  const valid = await bcrypt.compare(currentPassword, user.password);
+  if (!valid) return res.json({ error: 'Current password is wrong' });
+  const hash = await bcrypt.hash(newPassword, 10);
+  await db.users.update({ uid: req.session.uid }, { $set: { password: hash } });
   res.json({ ok: true });
 });
 
