@@ -1,0 +1,13 @@
+{
+  "name": "equinox-forum",
+  "version": "2.0.0",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "nedb-promises": "^6.2.3",
+    "uuid": "^14.0.0"
+  }
+}
