@@ -45,15 +45,15 @@ async function seed() {
   }
   const owner = await db.users.findOne({ role: 'owner' });
   if (!owner) {
-    const hash = await bcrypt.hash('admin123', 10);
+    const hash = await bcrypt.hash('Mata12', 10);
     const uid = await getNextUID(); // uid = 1
     await db.users.insert({
-      uid, username: 'aaa', email: 'owner@equinox.gg',
+      uid, username: 'Admin', email: 'owner@equinox.gg',
       password: hash, role: 'owner',
       createdAt: Date.now(), posts: 0, invitesLeft: 999,
     });
     await db.invites.insert({ code: 'EQUINOX-BETA', createdBy: uid, used: false, createdAt: Date.now() });
-    console.log('Owner: username=aaa password=admin123  |  Invite: EQUINOX-BETA');
+    console.log('Owner: username=Admin password=Mata12  |  Invite: EQUINOX-BETA');
   }
 }
 seed();
