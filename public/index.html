@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -440,13 +439,21 @@ button{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:12px;bor
   <div class="layout">
     <div>
       <div style="font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;color:#fff;margin-bottom:16px">Admin Panel</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px">
         <div class="section-card" style="padding:16px">
           <div style="font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px">Create Invite</div>
           <button class="btn-primary btn-sm" onclick="adminGenInvite()"><i class="ti ti-ticket"></i>Generate</button>
           <div id="admin-invite-out" style="margin-top:10px"></div>
         </div>
         <div class="section-card" style="padding:16px" id="admin-stats-box"></div>
+        <div class="section-card" style="padding:16px">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px">Change Password</div>
+          <div class="field" style="margin-bottom:8px"><input id="cp-current" type="password" placeholder="Current password"></div>
+          <div class="field" style="margin-bottom:8px"><input id="cp-new" type="password" placeholder="New password (min. 6)"></div>
+          <div class="field" style="margin-bottom:10px"><input id="cp-confirm" type="password" placeholder="Confirm new password"></div>
+          <button class="btn-primary btn-sm" onclick="changePassword()"><i class="ti ti-lock"></i>Update Password</button>
+          <div class="err" id="cp-err"></div>
+        </div>
       </div>
       <div class="section-card">
         <div class="section-header"><span class="section-header-title"><i class="ti ti-users"></i>All Members</span></div>
@@ -558,9 +565,11 @@ function renderAuthArea(){
     <button class="btn-ghost btn-sm" onclick="doLogout()"><i class="ti ti-logout"></i>Logout</button>`;
     nR.style.display='flex'; nI.style.display='flex';
     if(['owner','admin'].includes(me.role)) nA.style.display='flex';
+    document.getElementById('btn-new-home').style.display='flex';
   } else {
     el.innerHTML=`<button class="btn-primary btn-sm" onclick="openModal()"><i class="ti ti-login"></i>Sign In</button>`;
     nR.style.display=nI.style.display=nA.style.display='none';
+    document.getElementById('btn-new-home').style.display='none';
   }
 }
 function openModal(){document.getElementById('auth-modal').classList.add('active');}
@@ -672,7 +681,7 @@ async function loadHome(){
         <span class="section-header-title" style="color:${c.color}"><i class="ti ${c.icon}"></i>${esc(c.name)}</span>
         ${c.adminOnly?'<span class="bdg bdg-lock"><i class="ti ti-lock" style="font-size:9px"></i>Staff Only</span>':''}
       </div>
-      <div class="cat-row" onclick="navigate('category',{catId:'${c._id}',catName:${JSON.stringify(c.name)},catColor:'${c.color}',adminOnly:${c.adminOnly}})">
+      <div class="cat-row" onclick="openCat('${c._id}')">
         <div class="cat-icon-wrap" style="background:${c.color}18"><i class="ti ${c.icon}" style="color:${c.color};font-size:20px"></i></div>
         <div>
           <div class="cat-name">${esc(c.name)}</div>
@@ -691,12 +700,17 @@ async function loadHome(){
 // ═══════════════════════════════════════════════════════
 // CATEGORY
 // ═══════════════════════════════════════════════════════
+function openCat(catId){
+  const cat = allCats.find(c=>c._id===catId);
+  if(!cat) return;
+  navigate('category',{catId:cat._id, catName:cat.name, catColor:cat.color, adminOnly:cat.adminOnly});
+}
 async function loadCategory({catId, catName, catColor, adminOnly}){
   curCat={id:catId,name:catName,color:catColor,adminOnly};
   document.getElementById('cat-crumb-name').textContent=catName;
   document.getElementById('cat-page-title').textContent=catName;
   const canPost = me.loggedIn && (!adminOnly || ['owner','admin'].includes(me.role));
-  document.getElementById('btn-new-cat').style.display=canPost?'flex':'none';
+  document.getElementById('btn-new-cat').style.display = canPost ? 'flex' : 'none';
 
   const [threads, stats]=await Promise.all([api('/api/threads/'+catId),api('/api/stats')]);
   document.getElementById('cat-sidebar-stats').innerHTML=statsHtml(stats);
@@ -806,9 +820,14 @@ async function delThread(id){
 // ═══════════════════════════════════════════════════════
 function openNT(){
   if(!me.loggedIn){openModal();return;}
+  const isStaff=['owner','admin'].includes(me.role);
+  const writable=allCats.filter(c=>!c.adminOnly||isStaff);
+  if(!writable.length){toast('No categories available to post in','error');return;}
   const sel=document.getElementById('nt-cat');
-  const writable=allCats.filter(c=>!c.adminOnly||['owner','admin'].includes(me.role));
   sel.innerHTML=writable.map(c=>`<option value="${c._id}" ${curCat&&c._id===curCat.id?'selected':''}>${esc(c.name)}</option>`).join('');
+  document.getElementById('nt-title').value='';
+  document.getElementById('nt-content').value='';
+  document.getElementById('nt-err').textContent='';
   document.getElementById('nt-modal').classList.add('active');
 }
 function closeNT(){document.getElementById('nt-modal').classList.remove('active');}
@@ -940,6 +959,19 @@ async function delUser(uid){
   if(!confirm('Delete this user?'))return;
   const r=await api('/api/admin/user/'+uid,{method:'DELETE'});
   r.ok?toast('User deleted'):toast(r.error,'error'); loadAdmin();
+}
+async function changePassword(){
+  const current=document.getElementById('cp-current').value;
+  const newPass=document.getElementById('cp-new').value;
+  const confirm=document.getElementById('cp-confirm').value;
+  if(newPass!==confirm){document.getElementById('cp-err').textContent='Passwords do not match';return;}
+  const r=await api('/api/changepassword',{method:'POST',body:JSON.stringify({currentPassword:current,newPassword:newPass})});
+  if(r.error){document.getElementById('cp-err').textContent=r.error;return;}
+  document.getElementById('cp-current').value='';
+  document.getElementById('cp-new').value='';
+  document.getElementById('cp-confirm').value='';
+  document.getElementById('cp-err').textContent='';
+  toast('Password changed successfully!');
 }
 async function adminGenInvite(){
   const r=await api('/api/invites/create',{method:'POST',body:'{}'});
